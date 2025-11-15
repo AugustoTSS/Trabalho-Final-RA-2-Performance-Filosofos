@@ -1,0 +1,27 @@
+Dados:
+ N = 5 filósofos
+ Garfos 0 ... N-1 (garfo i fica entre filósofos i e (i+1) mod N)
+
+Para cada filósofo p:
+ leftForkId  = p              // garfo à esquerda
+ rightForkId = (p + 1) % N    // garfo à direita
+
+ left  = min(leftForkId, rightForkId)
+ right = max(leftForkId, rightForkId)
+
+ Loop:
+   pensar()
+   estado[p] <- "com fome"
+   adquirir(left)   // bloqueia até o garfo 'left' ficar livre
+   adquirir(right)  // bloqueia até o garfo 'right' ficar livre
+   estado[p] <- "comendo"
+   comer()
+   liberar(right)
+   liberar(left)
+   estado[p] <- "pensando"
+
+Observação:
+- A ordem global (menor índice antes do maior) impede espera circular,
+  dai sistema não pode fafzer um ciclo de espera e deadlock nao accontece.
+- Justiça: para fairness mais forte, incorporar semáforo/monitor FIFO ou política
+  que priorize filósofos que esperaram mais tempo.
