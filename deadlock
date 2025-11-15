@@ -1,0 +1,50 @@
+/*
+ * Demonstra deadlock entre duas threads usando LOCK_A e LOCK_B
+ * Logs mostram a ordem de aquisição; main detecta travamento por timeout.
+ */
+public class Deadlock {
+    static final Object LOCK_A = new Object();
+    static final Object LOCK_B = new Object();
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(() -> {
+            synchronized (LOCK_A) {
+                System.out.println("T1: adquiriu LOCK_A");
+                dormir(100);
+                System.out.println("T1: tentando adquirir LOCK_B");
+                synchronized (LOCK_B) {
+                    System.out.println("T1: adquiriu LOCK_B (não deve chegar aqui em deadlock)");
+                }
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            synchronized (LOCK_B) {
+                System.out.println("T2: adquiriu LOCK_B");
+                dormir(100);
+                System.out.println("T2: tentando adquirir LOCK_A");
+                synchronized (LOCK_A) {
+                    System.out.println("T2: adquiriu LOCK_A (não deve chegar aqui em deadlock)");
+                }
+            }
+        });
+
+        t1.start();
+        t2.start();
+
+        // Aguarda por um tempo; se as threads não terminarem, informamos deadlock
+        t1.join(1000);
+        t2.join(1000);
+
+        if (t1.isAlive() || t2.isAlive()) {
+            System.out.println("Deadlock provável: uma ou mais threads ainda estão bloqueadas após timeout.");
+            System.out.println("Logs acima mostram a sequência de aquisições que levou ao deadlock.");
+        } else {
+            System.out.println("Execução finalizada (sem deadlock neste run).");
+        }
+    }
+
+    static void dormir(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+}
