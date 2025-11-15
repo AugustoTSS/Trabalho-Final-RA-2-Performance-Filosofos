@@ -1,0 +1,41 @@
+relatorio Jantar dos Filósofos, Semáforos e Deadlock
+
+Resumo do problema (Parte 1)
+- Modelo: N = 5 filósofos em mesa circular; garfos entre pares; para comer um filósofo precisa dos dois garfos adjacentes.
+- Protocolo ingênuo: cada filósofo pega um garfo (por exemplo, o da esquerda) e depois o outro. Se todos pegarem primeiro o garfo esquerdo, formam-se N bloqueios "segurando um garfo e esperando outro" — resultado: impasse (deadlock).
+- Por que surge o impasse: as quatro condições de Coffman estão presentes simultaneamente:
+  1. Exclusão mútua — cada garfo só pode ser usado por um filósofo.
+  2. Hold-and-wait (manter-e-esperar) — filósofos seguram um garfo e esperam o outro.
+  3. Não-preempção — um garfo não pode ser retirado de quem o detém.
+  4. Espera circular — existe um ciclo de dependências (p1 -> p2 -> ... -> p1).
+- O protocolo ingênuo mantém todas as quatro condições, portanto deadlock é possível.
+
+Solução proposta (hierarquia de recursos)
+- Estratégia: impor uma ordem global fixa sobre os recursos (garfos 0..N-1). Cada filósofo requisita primeiro o garfo de menor índice entre os seus dois garfos, depois o de maior índice.
+- Por que funciona: elimina a condição de espera circular (não pode existir ciclo de espera se todos requisitam recursos na mesma ordem total/linear). Isso quebra uma das condições necessárias (espera circular) e portanto previne deadlock.
+- Fairness/progresso: a hierarquia evita deadlock; starvation não é automaticamente resolvido (depende do escalonador e de diferenças de prioridade). Para fairness forte, combinar com filas/semáforos justos ou mecanismo de notificação FIFO (monitor com condições) é recomendado.
+
+Pseudocódigo (resumido)
+- left = min(garfo_esq, garfo_dir)
+- right = max(garfo_esq, garfo_dir)
+- adquirir(left)
+- adquirir(right)
+- comer()
+- liberar(right)
+- liberar(left)
+
+Parte 2 — Threads e Semáforos (contador concorrente)
+- Objetivo: demonstrar condição de corrida e corrigi-la.
+- Versão sem proteção: incrementos feitos em uma variável inteira compartilhada sem sincronização geram resultados incorretos por perda de atualizações.
+- Versão com Semaphore(1, true): assegura exclusão mútua e ordem FIFO na aquisição, garantindo valor final correto T×M. Trade-off: reduz throughput por serializar a seção crítica; ao usar mode fair=true temos maior garantia de justiça, mas com overhead adicional.
+
+Parte 3 — Deadlock (atividade)
+- Demonstração: duas threads e dois locks (A e B); cada thread adquire um lock e depois tenta o outro em ordem oposta, produzindo espera circular e travamento.
+- Correção: impor ordem global (sempre adquirir LOCK_A antes de LOCK_B) quebra espera circular. Alternativa: usar um único semáforo para a região crítica, ou alocação atômica.
+
+Conclusão
+- Evite logging/IO no loop crítico; meça latências; prefira locks não-fair se objetivo for throughput, use fair locks/semaphores se justiça for prioritária.
+- Para determinismo e requisitos de tempo real, considere JVM/RT-JVM e afinidade de threads; ou implemente mecanismos com filas determinísticas.
+- Para garantir ausência tanto de deadlock quanto de starvation, combine hierarquia (prevenção de deadlock) com políticas de fila (fair semaphores ou monitors FIFO).
+
+Referências incorporadas ao enunciado: condições de Coffman, soluções por hierarquia / waiter / semáforo N−1 / monitores (estado THINK/HUNGRY/EATING).
