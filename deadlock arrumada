@@ -1,0 +1,43 @@
+/*
+ * Correção do DeadlockDemo: impor ordem global (LOCK_A antes de LOCK_B) em ambas as threads.
+ * Agora não existe espera circular.
+ */
+public class Deadlockarrumada {
+    static final Object LOCK_A = new Object();
+    static final Object LOCK_B = new Object();
+
+    public static void main(String[] args) throws InterruptedException {
+        Thread t1 = new Thread(() -> {
+            synchronized (LOCK_A) {
+                System.out.println("T1: adquiriu LOCK_A");
+                dormir(50);
+                System.out.println("T1: tentando adquirir LOCK_B");
+                synchronized (LOCK_B) {
+                    System.out.println("T1: adquiriu LOCK_B e concluiu");
+                }
+            }
+        });
+
+        Thread t2 = new Thread(() -> {
+            // também adquire A antes de B, respeitando a hierarquia
+            synchronized (LOCK_A) {
+                System.out.println("T2: adquiriu LOCK_A");
+                dormir(50);
+                System.out.println("T2: tentando adquirir LOCK_B");
+                synchronized (LOCK_B) {
+                    System.out.println("T2: adquiriu LOCK_B e concluiu");
+                }
+            }
+        });
+
+        t1.start();
+        t2.start();
+        t1.join();
+        t2.join();
+        System.out.println("Execução concluída sem deadlock (hierarquia aplicada).");
+    }
+
+    static void dormir(long ms) {
+        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+    }
+}
