@@ -1,0 +1,74 @@
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
+import java.util.Random;
+
+/
+ * Simula N=5 com protocolo ingênuo: pega primeiro o garfo esquerdo, depois o direito.
+ * Usa CountDownLatch para sincronizar início e forçar condição em que todos pegam
+ * o garfo esquerdo aproximadamente ao mesmo tempo, evidenciando deadlock.
+ * Logs mostram estados: pensando, com fome, pega garfo esquerdo, espera direito e comendo.
+/
+public class jantarfilosofo {
+    static final int N = 5;
+    static final int ITER = 1; // cada filósofo tenta comer 1 vez pra deadlock
+    public static void main(String[] args) throws Exception {
+        ReentrantLock[] forks = new ReentrantLock[N];
+        for (int i = 0; i < N; i++) forks[i] = new ReentrantLock();
+
+        CountDownLatch ready = new CountDownLatch(N);
+        CountDownLatch start = new CountDownLatch(1);
+
+        ExecutorService pool = Executors.newFixedThreadPool(N);
+        for (int i = 0; i < N; i++) {
+            final int id = i;
+            pool.submit(() -> {
+                try {
+                    Random rnd = new Random();
+                    ready.countDown();
+                    start.await(); // sincroniza todos para começar tudo junto
+                    for (int it = 0; it < ITER; it++) {
+                        System.out.printf("F%d: pensando%n", id);
+                        Thread.sleep(10 + rnd.nextInt(10));
+                        System.out.printf("F%d: com fome%n", id);
+                        int left = id;
+                        int right = (id + 1) % N;
+                        // Protocolo ingênuo: pega esquerdo, depois direito
+                        System.out.printf("F%d: tentando adquirir garfo ESQ(%d)%n", id, left);
+                        forks[left].lock();
+                        try {
+                            System.out.printf("F%d: adquiriu ESQ(%d), esperando pegar DIR(%d)%n", id, left, right);
+                            // pausa para aumentar chance de todos segurarem o esquerdo simultaneamente
+                            Thread.sleep(50);
+                            System.out.printf("F%d: tentando adquirir garfo DIR(%d)%n", id, right);
+                            forks[right].lock(); // aqui pode bloquear indefinidamente (deadlock)
+                            try {
+                                System.out.printf("F%d: comendo%n", id);
+                            } finally {
+                                forks[right].unlock();
+                                System.out.printf("F%d: liberou DIR(%d)%n", id, right);
+                            }
+                        } finally {
+                            forks[left].unlock();
+                            System.out.printf("F%d: liberou ESQ(%d)%n", id, left);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+
+        // aguarda tudo pronto e soltaa ao mesmo tempo
+        ready.await();
+        start.countDown();
+
+        // aguarda um tempo ok e detecta travamento caso nada de certo
+        pool.shutdown();
+        if (!pool.awaitTermination(5, TimeUnit.SECONDS)) {
+            System.out.println("Possível deadlock detectado: threads não terminaram dentro do timeout.");
+            System.out.println("Observação: os logs acima devem mostrar todos os filósofos tendo adquirido o garfo esquerdo e bloqueados no direito.");
+        } else {
+            System.out.println("Execução finalizada (sem deadlock detectado neste run).");
+        }
+    }
+}
