@@ -1,0 +1,60 @@
+import java.util.concurrent.*;
+import java.util.concurrent.locks.*;
+import java.util.Random;
+
+/*
+ * Implementação com hierarquia de recursos (pegar o garfo de menor id primeiro).
+ * Deve evitar deadlock e permitir que todos comam.
+ */
+public class Hierarquiajantarfilosofo {
+    static final int N = 5;
+    static final int ITER = 3; // repetir algumas vezes
+    public static void main(String[] args) throws Exception {
+        ReentrantLock[] forks = new ReentrantLock[N];
+        for (int i = 0; i < N; i++) forks[i] = new ReentrantLock();
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(N);
+
+        for (int i = 0; i < N; i++) {
+            final int id = i;
+            pool.submit(() -> {
+                Random rnd = new Random();
+                try {
+                    start.await();
+                    for (int it = 0; it < ITER; it++) {
+                        System.out.printf("F%d: pensando%n", id);
+                        Thread.sleep(5 + rnd.nextInt(10));
+                        System.out.printf("F%d: com fome%n", id);
+                        int g1 = id;
+                        int g2 = (id + 1) % N;
+                        int left = Math.min(g1, g2);
+                        int right = Math.max(g1, g2);
+                        System.out.printf("F%d: adquirindo %d então %d%n", id, left, right);
+                        forks[left].lock();
+                        try {
+                            forks[right].lock();
+                            try {
+                                System.out.printf("F%d: comendo%n", id);
+                                Thread.sleep(5 + rnd.nextInt(10));
+                            } finally {
+                                forks[right].unlock();
+                                System.out.printf("F%d: liberou %d%n", id, right);
+                            }
+                        } finally {
+                            forks[left].unlock();
+                            System.out.printf("F%d: liberou %d%n", id, left);
+                        }
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+        }
+
+        start.countDown();
+        pool.shutdown();
+        pool.awaitTermination(1, TimeUnit.MINUTES);
+        System.out.println("Execução concluída sem deadlock (hierarquia).");
+    }
+}
